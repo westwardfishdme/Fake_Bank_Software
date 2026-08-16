@@ -1,11 +1,10 @@
-use std::error::Error;
-
-use crate::database::utilities::{DatabaseInteractions, open_authentication_database};
-
+use super::accounts::{self, Account};
 use hex::{self, ToHex};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sha2::{Digest, Sha256};
+use sled::Db;
+use std::error::Error;
 
 fn create_salt() -> String {
     let mut chars = [0_u8; 16];
@@ -51,7 +50,7 @@ impl Authentication {
         username: T,
         new_password: U,
     ) -> Authentication {
-        //! Creates a new user with user privileges
+        //! Creates a new user with user privileges, and submits it to the database
         let (password, salt_value) = create_new_password(new_password.to_string());
         Authentication {
             user: username.to_string(),
@@ -83,32 +82,39 @@ impl Authentication {
         //! returns a hash for an inputted password with a given hash value.
         hash(format!("{password}{}", self.salt))
     }
-    pub fn authenticate<T: ToString>(&self, entered_password: T) -> bool {
+    pub fn authenticate<T: ToString>(
+        &self,
+        entered_password: T,
+        account_db: &Db,
+    ) -> Option<Account> {
         //! authenticates a user. returns:
         //! - true on success
         //! - false on fail
 
         let hash_result = self.create_hash_with_salt(entered_password.to_string());
         // our return value
-        hash_result == self.password_hash
+        if hash_result == self.password_hash {
+            return Some(accounts::get_from_database(self.username(), account_db));
+        }
+        None
     }
     pub fn username(&self) -> String {
         self.user.clone()
     }
-}
-impl<T: ToString, S: ToString> DatabaseInteractions<T, S> for Authentication {
-    type ValueStruct = Authentication;
-    fn create(username: T, password: S) -> Result<(), Box<dyn Error>> {
-        //! creates an object in the authentication database
-        let db = open_authentication_database();
-        let new_user = Authentication::create_new_user(username.to_string(), password.to_string());
-        let json = serde_json::to_string(&new_user)?;
-        db.insert(username.to_string().as_bytes(), json.as_bytes())?;
+
+    // database
+    fn db_create(&self, db: &Db) -> Result<(), Box<dyn Error>> {
+        //! creates an authentication account in the auth db
+        let json = serde_json::to_string(self)?;
+        db.insert(self.username(), json.as_bytes())?;
         Ok(())
     }
-    fn get_from_database(username: T) -> Result<Self::ValueStruct, Box<dyn Error>> {
+
+    fn get_from_database<T: ToString>(
+        username: T,
+        db: &Db,
+    ) -> Result<Option<Authentication>, Box<dyn Error>> {
         //! gets an object in the authentication database
-        let db = open_authentication_database();
         // access the stored binary values
         let stored_binary_values = db.get(username.to_string())?;
         let db_item: Authentication = match stored_binary_values {
@@ -117,24 +123,21 @@ impl<T: ToString, S: ToString> DatabaseInteractions<T, S> for Authentication {
                 serde_json::from_str(&json)?
             }
             None => {
-                eprintln!("Error in database retrieval; returning empty auth struct");
-                return Ok(Authentication::empty());
+                eprintln!("Error in database retrieval; key had no stored values");
+                return Ok(None);
             }
         };
-        Ok(db_item)
+        Ok(Some(db_item))
     }
-    fn update(&mut self) -> Result<(), Box<dyn Error>> {
+    fn update(&self, db: &Db) -> Result<(), Box<dyn Error>> {
         //! updates an object in the authentication database
-        let db = open_authentication_database();
         let json = serde_json::to_string(self)?;
         db.remove(self.username())?;
         db.insert(self.username(), json.as_bytes())?;
         Ok(())
     }
-    fn delete(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn delete(&self, db: &Db) -> Result<(), Box<dyn std::error::Error>> {
         //! deletes an object in the authentication database
-        let db = open_authentication_database();
-        let json = serde_json::to_string(self)?;
         db.remove(self.username())?;
         Ok(())
     }
@@ -144,6 +147,7 @@ impl<T: ToString, S: ToString> DatabaseInteractions<T, S> for Authentication {
 /* Unit tests */
 /// These are the unit tests for the authentication system.
 mod tests {
+
     #[allow(unused_imports)]
     use super::*;
 
@@ -173,9 +177,15 @@ mod tests {
     #[test]
     fn test_authentication() {
         let user_session = create_user();
+        let user_db = crate::database::utilities::open_user_database();
+
         // test authentication
-        assert!(user_session.authenticate("badpassword"));
-        assert!(!user_session.authenticate("badpassword123"));
+        assert!(user_session.authenticate("badpassword", &user_db).is_some());
+        assert!(
+            user_session
+                .authenticate("badpassword123", &user_db)
+                .is_none()
+        );
     }
     #[test]
     fn test_get_username() {
@@ -190,5 +200,40 @@ mod tests {
             user_session.get_password_hash(),
             user_session2.get_password_hash()
         );
+    }
+    #[test]
+    fn test_db() {
+        let mut user_session = create_user();
+        let db = crate::database::utilities::open_authentication_database();
+        match user_session.db_create(&db) {
+            Ok(_) => (),
+            Err(_) => user_session.update(&db).expect("failed to update a new db"),
+        }
+        // test creation
+        Authentication::get_from_database("john", &db)
+            .expect("failed to retrieve a value from the db");
+        // test updating
+        assert_eq!(user_session.get_perms(), 2);
+        user_session.set_perms(0);
+        user_session
+            .update(&db)
+            .expect("failed to update the value");
+        let updated_session = Authentication::get_from_database("john", &db)
+            .expect("failed to retrieve a value from the db");
+        assert_eq!(
+            updated_session
+                .expect("got none when expected a value")
+                .get_perms(),
+            0
+        );
+        // test deletion
+        user_session
+            .delete(&db)
+            .expect("failed to delete the value");
+        assert!(
+            Authentication::get_from_database("john", &db)
+                .expect("failed to get a valid result")
+                .is_none()
+        )
     }
 }

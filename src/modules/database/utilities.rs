@@ -2,13 +2,11 @@
 /// that do some basic functions pertaining to the database. This acts
 /// as an interface to the underlying system that uses sled.
 use sled::{self, Db};
-#[inline]
 pub fn open_authentication_database() -> Db {
     //! returns the auth_database
     println!("opening auth_database...");
     sled::open(crate::AUTHENTICATION_DATABASE_PATH).unwrap()
 }
-#[inline]
 pub fn open_user_database() -> Db {
     //! returns the auth_database
     println!("opening user_information_database...");
