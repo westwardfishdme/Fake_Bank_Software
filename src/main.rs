@@ -1,10 +1,9 @@
 mod modules;
-use modules::accounts;
-use modules::database;
-use std::path::PathBuf;
+use modules::{accounts, database, rest};
 
 use axum;
 use sled::{self, Db};
+use std::rc::Rc;
 use tokio::io::AsyncReadExt;
 
 /// location of the AUTHENTICATION_DATABASE.
@@ -19,28 +18,16 @@ const IP: &str = "0.0.0.0";
 /// nothing too special here about it.
 const PORT: u16 = 8080;
 
-async fn listen_server(
-    ip_and_port: &str,
-    listener: &tokio::net::TcpListener,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("waiting for tcp connection on {ip_and_port}");
-    let (_, address) = listener.accept().await?;
-    println!(
-        "received tcp connection on {ip_and_port}:\n\tfrom: {}\n\t  on: {}",
-        address, ip_and_port
-    );
-    Ok(())
-}
-
-async fn handle_api_req() {
-    std::process::exit(0);
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server = format!("{IP}:{PORT}");
     let listener = tokio::net::TcpListener::bind(&server).await?;
-    loop {
-        listen_server(server.as_str(), &listener).await?;
-    }
+
+    let rest_api = rest::handler::run();
+    println!("waiting for tcp connection on {server}");
+    axum::serve::serve(listener, rest_api)
+        .await
+        .expect("failed to start");
+    println!("received tcp connection on: {}", server);
+    Ok(())
 }
