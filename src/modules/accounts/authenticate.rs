@@ -16,10 +16,12 @@ fn create_salt() -> String {
 
     String::from_utf8_lossy(&chars).to_string()
 }
+
 fn hash(password: String) -> String {
     //! creates a password hash from a given string
     Sha256::digest(password.as_bytes()).as_slice().encode_hex()
 }
+
 fn create_new_password(password: String) -> (String, String) {
     //! creates the hash of our salted password, returns both the hash and the salt.
     let salt = create_salt();
@@ -27,7 +29,39 @@ fn create_new_password(password: String) -> (String, String) {
     (hash(better_password), salt)
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Authentication {
+pub struct Authenticate {
+    username: String,
+    password: String,
+}
+
+impl Authenticate {
+    pub fn login(self, auth_db: &Db) -> Result<Option<AuthenticationDatabase>, Box<dyn Error>> {
+        //! returns the auth db values.
+        let stored_binary_values = auth_db.get(self.username)?;
+        let db_item: AuthenticationDatabase = match stored_binary_values {
+            Some(v) => {
+                let json = String::from_utf8(v.to_vec())?;
+                serde_json::from_str(&json)?
+            }
+            None => {
+                eprintln!("Error in database retrieval; key had no stored values");
+                return Ok(None);
+            }
+        };
+        Ok(Some(db_item))
+    }
+    pub fn create(self, auth_db: &Db) {
+        AuthenticationDatabase::create_new_user(self.username, self.password)
+            .db_create(auth_db)
+            .expect("failed to create the user in the database");
+    }
+    pub fn password(&self) -> &str {
+        return &self.password;
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AuthenticationDatabase {
     /// Username of the account
     user: String,
     /// permission
@@ -36,23 +70,23 @@ pub struct Authentication {
     salt: String,
 }
 
-impl Authentication {
-    fn empty() -> Authentication {
+impl AuthenticationDatabase {
+    fn empty() -> AuthenticationDatabase {
         // exploit lies here.
-        Authentication {
+        AuthenticationDatabase {
             user: String::new(),
             permission_id: 0,
             password_hash: String::new(),
             salt: String::new(),
         }
     }
-    pub fn create_new_user<T: ToString, U: ToString>(
+    fn create_new_user<T: ToString, U: ToString>(
         username: T,
         new_password: U,
-    ) -> Authentication {
+    ) -> AuthenticationDatabase {
         //! Creates a new user with user privileges, and submits it to the database
         let (password, salt_value) = create_new_password(new_password.to_string());
-        Authentication {
+        AuthenticationDatabase {
             user: username.to_string(),
             password_hash: password,
             salt: salt_value,
@@ -86,17 +120,17 @@ impl Authentication {
         &self,
         entered_password: T,
         account_db: &Db,
-    ) -> Option<Account> {
-        //! authenticates a user. returns:
-        //! - true on success
-        //! - false on fail
+    ) -> Result<Option<Account>, Box<dyn Error>> {
+        //! authenticates a user. if the user doesn't exist, it should fail.
 
         let hash_result = self.create_hash_with_salt(entered_password.to_string());
+        let account = accounts::db_get(self.username(), account_db)?;
         // our return value
         if hash_result == self.password_hash {
-            return Some(accounts::get_from_database(self.username(), account_db));
+            Ok(account)
+        } else {
+            Ok(None)
         }
-        None
     }
     pub fn username(&self) -> String {
         self.user.clone()
@@ -110,14 +144,14 @@ impl Authentication {
         Ok(())
     }
 
-    fn get_from_database<T: ToString>(
+    fn db_get<T: ToString>(
         username: T,
         db: &Db,
-    ) -> Result<Option<Authentication>, Box<dyn Error>> {
+    ) -> Result<Option<AuthenticationDatabase>, Box<dyn Error>> {
         //! gets an object in the authentication database
         // access the stored binary values
         let stored_binary_values = db.get(username.to_string())?;
-        let db_item: Authentication = match stored_binary_values {
+        let db_item: AuthenticationDatabase = match stored_binary_values {
             Some(v) => {
                 let json = String::from_utf8(v.to_vec())?;
                 serde_json::from_str(&json)?
@@ -129,14 +163,14 @@ impl Authentication {
         };
         Ok(Some(db_item))
     }
-    fn update(&self, db: &Db) -> Result<(), Box<dyn Error>> {
+    fn db_update(&self, db: &Db) -> Result<(), Box<dyn Error>> {
         //! updates an object in the authentication database
         let json = serde_json::to_string(self)?;
         db.remove(self.username())?;
         db.insert(self.username(), json.as_bytes())?;
         Ok(())
     }
-    fn delete(&self, db: &Db) -> Result<(), Box<dyn std::error::Error>> {
+    fn db_delete(&self, db: &Db) -> Result<(), Box<dyn std::error::Error>> {
         //! deletes an object in the authentication database
         db.remove(self.username())?;
         Ok(())
@@ -152,10 +186,10 @@ mod tests {
     use super::*;
 
     #[allow(unused)]
-    fn create_user() -> Authentication {
+    fn create_user() -> AuthenticationDatabase {
         let username = "john";
         let new_password = String::from("badpassword");
-        Authentication::create_new_user(username, new_password)
+        AuthenticationDatabase::create_new_user(username, new_password)
     }
 
     #[test]
@@ -177,7 +211,7 @@ mod tests {
     #[test]
     fn test_authentication() {
         let user_session = create_user();
-        let user_db = crate::database::utilities::open_user_database();
+        let user_db = crate::modules::database::utilities::open_user_database();
 
         // test authentication
         assert!(user_session.authenticate("badpassword", &user_db).is_some());
@@ -204,13 +238,13 @@ mod tests {
     #[test]
     fn test_db() {
         let mut user_session = create_user();
-        let db = crate::database::utilities::open_authentication_database();
+        let db = crate::modules::database::utilities::open_authentication_database();
         match user_session.db_create(&db) {
             Ok(_) => (),
             Err(_) => user_session.update(&db).expect("failed to update a new db"),
         }
         // test creation
-        Authentication::get_from_database("john", &db)
+        AuthenticationDatabase::db_get("john", &db)
             .expect("failed to retrieve a value from the db");
         // test updating
         assert_eq!(user_session.get_perms(), 2);
@@ -218,7 +252,7 @@ mod tests {
         user_session
             .update(&db)
             .expect("failed to update the value");
-        let updated_session = Authentication::get_from_database("john", &db)
+        let updated_session = AuthenticationDatabase::db_get("john", &db)
             .expect("failed to retrieve a value from the db");
         assert_eq!(
             updated_session
@@ -231,7 +265,7 @@ mod tests {
             .delete(&db)
             .expect("failed to delete the value");
         assert!(
-            Authentication::get_from_database("john", &db)
+            AuthenticationDatabase::db_get("john", &db)
                 .expect("failed to get a valid result")
                 .is_none()
         )
