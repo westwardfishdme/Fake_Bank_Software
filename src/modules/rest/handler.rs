@@ -1,11 +1,15 @@
-use crate::modules::accounts;
+use std::io::ErrorKind::AlreadyExists;
+
+use crate::modules::accounts::{self, authenticate::Authenticate};
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
-use serde_json::json;
+use serde_json::{Value, json};
+use sled::Db;
 
 #[derive(Debug, PartialEq)]
-pub enum APIError {
+enum APIError {
     NotFound,
     FailedAuthentication,
+    AlreadyExists,
     InvalidInput(String),
     InternalError,
 }
@@ -18,12 +22,13 @@ impl IntoResponse for APIError {
             APIError::InvalidInput(message) => (StatusCode::BAD_REQUEST, message),
             APIError::FailedAuthentication => (
                 StatusCode::UNAUTHORIZED,
-                "failed to authenticate user. access wqas denied".into(),
+                "failed to authenticate user. access was denied".into(),
             ),
             APIError::InternalError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "server failed internally; check logs".into(),
+                "server failed internally.".into(),
             ),
+            APIError::AlreadyExists => (StatusCode::BAD_REQUEST, "User already exists".into()),
         };
         let body = axum::Json(json!({
             "error": e
@@ -39,15 +44,102 @@ async fn health() -> impl IntoResponse {
     }))
 }
 
-async fn login() -> impl IntoResponse {
+/* logins */
+async fn get_login() -> impl IntoResponse {
     Json(json!({
         "status":400,
-        "message": "this would attempt to authenticate the user"
+        "message": "login server is up and running"
     }))
 }
+async fn post_login(
+    Json(auth_payload): Json<Authenticate>,
+    auth_db: Db,
+) -> Result<Json<Value>, APIError> {
+    //! gets the user login from passing username
 
-pub fn run() -> Router {
+    /*
+     * [intentionally vulnerable]
+     * we want to create a user here and have users
+     * be able to grab the hash and salt values from just providing
+     * a valid user name.
+     */
+
+    match auth_payload
+        .login(&auth_db)
+        .expect("failed to authenticate in the REST API")
+    {
+        Some(v) => Ok(Json(serde_json::json!(v))),
+        None => Err(APIError::NotFound),
+    }
+}
+
+async fn post_create(
+    Json(auth_payload): Json<Authenticate>,
+    auth_db: Db,
+) -> Result<Json<Value>, APIError> {
+    //! creates an account in the database
+    /* [ intentionally vulnerable ]
+     * this will be used by pentesters and competitors
+     * to create a bad account
+     */
+    if auth_payload
+        .clone()
+        .login(&auth_db)
+        .expect("failed to authenticate in the REST API")
+        .is_none()
+    {
+        auth_payload.create(&auth_db);
+        return Ok(Json(json!({"user_creation":"success"})));
+    }
+    Err(APIError::AlreadyExists)
+}
+
+async fn post_acct(
+    Json(auth_payload): Json<Authenticate>,
+    auth_db: Db,
+    user_db: Db,
+) -> Result<Json<Value>, APIError> {
+    //! gets the user's account from authenticating.
+    let auth_payload = &auth_payload;
+
+    let account = match auth_payload
+        .clone()
+        .login(&auth_db)
+        .expect("failed to authenticate in the REST API")
+    {
+        Some(v) => v,
+        None => return Err(APIError::NotFound),
+    };
+
+    match account.authenticate(auth_payload.password(), &user_db) {
+        Ok(Some(v)) => Ok(Json(json!(v))),
+        Ok(None) => Err(APIError::FailedAuthentication),
+        Err(_) => Err(APIError::InternalError),
+    }
+}
+
+pub fn run(auth_db: Db, user_db: Db) -> Router {
     Router::new()
-        .route("/login", get(login))
+        .route(
+            "/login",
+            get(get_login).post({
+                let auth_db = auth_db.clone();
+                move |login| post_login(login, auth_db)
+            }),
+        )
+        .route(
+            "/login/account",
+            get(get_login).post({
+                let auth_db = auth_db.clone();
+                move |login| post_acct(login, auth_db, user_db)
+            }),
+        )
+        .route(
+            "/create",
+            get(()).post({
+                let auth_db = auth_db.clone();
+                move |create| post_create(create, auth_db)
+            }),
+        )
         .route("/health", get(health))
 }
