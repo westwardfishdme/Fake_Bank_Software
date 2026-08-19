@@ -1,15 +1,10 @@
 mod modules;
-use modules::{accounts, database, rest};
+use modules::rest;
 
 use axum;
-use sled::{self, Db};
-use std::rc::Rc;
-use tokio::io::AsyncReadExt;
+use sled;
 
-/// location of the AUTHENTICATION_DATABASE.
-const AUTHENTICATION_DATABASE_PATH: &str = "/tmp/auth_database";
-/// location of the USER_DATABASE
-const USER_DATABASE_PATH: &str = "/tmp/user_database";
+use crate::modules::database::utilities::{open_authentication_database, open_user_database};
 
 // rest API details
 /// IP should be set to 0.0.0.0 for global listens.
@@ -22,12 +17,13 @@ const PORT: u16 = 8080;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server = format!("{IP}:{PORT}");
     let listener = tokio::net::TcpListener::bind(&server).await?;
+    let auth_db = open_authentication_database();
+    let user_db = open_user_database();
 
-    let rest_api = rest::handler::run();
-    println!("waiting for tcp connection on {server}");
+    let rest_api = rest::handler::run(auth_db, user_db);
+    println!("starting RESTAPI @ {server}");
     axum::serve::serve(listener, rest_api)
         .await
-        .expect("failed to start");
-    println!("received tcp connection on: {}", server);
+        .expect("failed to start REST API");
     Ok(())
 }
