@@ -10,16 +10,14 @@ enum APIError {
     NotFound,
     FailedAuthentication,
     AlreadyExists,
-    InvalidInput(String),
     InternalError,
 }
 
 /// The IntoResponse
 impl IntoResponse for APIError {
     fn into_response(self) -> axum::response::Response {
-        let (status, e) = match self {
+        let (status, e): (StatusCode, String) = match self {
             APIError::NotFound => (StatusCode::NOT_FOUND, "could not query request".into()),
-            APIError::InvalidInput(message) => (StatusCode::BAD_REQUEST, message),
             APIError::FailedAuthentication => (
                 StatusCode::UNAUTHORIZED,
                 "failed to authenticate user. access was denied".into(),
@@ -48,7 +46,7 @@ async fn health() -> impl IntoResponse {
 async fn get_login() -> impl IntoResponse {
     Json(json!({
         "status":400,
-        "message": "login server is up and running"
+        "message": "login db is up and running"
     }))
 }
 async fn post_login(
@@ -114,7 +112,7 @@ async fn post_acct(
     match account.authenticate(auth_payload.password(), &user_db) {
         Ok(Some(v)) => Ok(Json(json!(v))),
         Ok(None) => Err(APIError::FailedAuthentication),
-        Err(_) => Err(APIError::InternalError),
+        Err(_) => Err(APIError::NotFound),
     }
 }
 
