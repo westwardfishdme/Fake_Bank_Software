@@ -20,14 +20,17 @@ fn enumerate_month(month: u32) -> &'static str {
 }
 
 pub fn now() -> String {
+    //! creates a timestamp.
+    //! looks like: [Fri Aug 31 03:00:30]
     let now = Local::now();
 
     format!(
-        "{} {} {} {}:{}",
+        "[{} {} {} {}:{}:{}]",
         now.weekday(),
         enumerate_month(now.month()),
         now.day(),
         now.hour(),
-        now.minute()
+        now.minute(),
+        now.second(),
     )
 }
