@@ -1,6 +1,5 @@
 use super::accounts::{self, Account};
-use crate::modules::database::utilities::DatabaseInteractions;
-use chrono::DateTime;
+use crate::modules::{database::utilities::DatabaseInteractions, logging::timestamp};
 use hex::{self, ToHex};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -11,10 +10,9 @@ use std::error::Error;
 /* general purpose functions */
 fn create_salt() -> String {
     let mut chars = [0_u8; 16];
-    for i in 0..chars.len() {
-        let new_char = rand::random_range(32..=127);
-        chars[i] = new_char;
-    }
+    chars.iter_mut().for_each(move |character| {
+        *character = rand::random_range(33..=127) as u8;
+    });
     String::from_utf8_lossy(&chars).to_string()
 }
 fn hash(password: String) -> String {
@@ -46,25 +44,20 @@ impl User {
             Some(v) => v,
             None => return Err("Missing 'new_password' field."),
         };
-        let mut auth = AuthenticationDetails::db_get(self.username, auth_db)
-            .expect("failed to read the database")
-            .expect("account did not exist");
+        let username = &self.username;
+        let logfail = format!(
+            "{}[authentication] {} did not exist within the authentication database",
+            timestamp::now(),
+            username
+        );
+        let mut auth = AuthenticationDetails::db_get(username, auth_db)
+            .expect("failed to read the authentication database")
+            .expect(logfail.as_str());
         auth.set_new_password(newpass, self.password, auth_db)
     }
     pub fn login(self, auth_db: &Db) -> Result<Option<AuthenticationDetails>, Box<dyn Error>> {
         //! returns the auth db values.
-        let stored_binary_values = auth_db.get(self.username)?;
-        let db_item: AuthenticationDetails = match stored_binary_values {
-            Some(v) => {
-                let json = String::from_utf8(v.to_vec())?;
-                serde_json::from_str(&json)?
-            }
-            None => {
-                eprintln!("Error in database retrieval; key had no stored values");
-                return Ok(None);
-            }
-        };
-        Ok(Some(db_item))
+        AuthenticationDetails::db_get(self.username, auth_db)
     }
 
     pub fn create(self, auth_db: &Db, acct_db: &Db) -> Result<(), &'static str> {
@@ -75,19 +68,34 @@ impl User {
             Some(v) => v,
             None => return Err("Missing value: init_balance in JSON request."),
         };
+        let missing_first: String = format!(
+            "{}[error] first name was not provided in account creation",
+            timestamp::now()
+        );
+        let missing_last: String = format!(
+            "{}[error] last name was not provided in account creation",
+            timestamp::now()
+        );
+
         let account = Account::create_new_user(
-            self.first_name
-                .expect("[error] first name was not provided in account creation"),
-            self.last_name
-                .expect("[error] last name was not provided in account creation"),
+            self.first_name.expect(missing_first.as_str()),
+            self.last_name.expect(missing_last.as_str()),
             initial_balance,
         )?;
+        let failed_creation = format!(
+            "{}[authentication]failed to create the user in the database",
+            timestamp::now()
+        );
         authentication
             .db_create(auth_db)
-            .expect("[authentication] failed to create the user in the database");
+            .expect(failed_creation.as_str());
+        let failed_creation = format!(
+            "{}[account]failed to create the user in the database",
+            timestamp::now()
+        );
         account
             .db_create(&username, acct_db)
-            .expect("[account] failed to create the user in the database");
+            .expect(failed_creation.as_str());
         Ok(())
     }
     pub fn username(&self) -> &str {
@@ -140,7 +148,7 @@ impl AuthenticationDetails {
         // performs the authentication first here
         let old_hash_result = self.create_hash_with_salt(old_password);
         let new_hash_result = self.create_hash_with_salt(new_password.to_string());
-        eprintln!("{} ?= {}", self.password_hash, old_hash_result);
+        println!("{} ?= {}", self.password_hash, old_hash_result);
         if old_hash_result != self.password_hash {
             return Err("incorrect password");
         }
@@ -151,7 +159,11 @@ impl AuthenticationDetails {
         let (password, salt_value) = create_new_password(new_password.to_string());
         self.password_hash = password;
         self.salt = salt_value;
-        self.db_update(db).expect("failed to update the database");
+        let fail_msg = format!(
+            "{}[authentication] failed to update the database",
+            timestamp::now()
+        );
+        self.db_update(db).expect(fail_msg.as_str());
         Ok(())
     }
 
@@ -215,7 +227,11 @@ impl AuthenticationDetails {
     pub fn db_create(&self, db: &Db) -> Result<(), Box<dyn Error>> {
         //! Creates an authentication account in the auth db.
         let json = serde_json::to_string(self)?;
-        println!("[authentication] Created new user: {}", self.username(),);
+        println!(
+            "{}[authentication] Created new user: {}",
+            timestamp::now(),
+            self.username(),
+        );
         db.insert(self.username(), json.as_bytes())?;
         Ok(())
     }
@@ -228,6 +244,11 @@ impl DatabaseInteractions for AuthenticationDetails {
     ) -> Result<Option<AuthenticationDetails>, Box<dyn Error>> {
         //! gets an object in the authentication database
         // access the stored binary values
+        println!(
+            "{}[authentication] attempting to retrieve the values for {}",
+            timestamp::now(),
+            username.to_string(),
+        );
         let stored_binary_values = db.get(username.to_string())?;
         let db_item: AuthenticationDetails = match stored_binary_values {
             Some(v) => {
@@ -235,10 +256,19 @@ impl DatabaseInteractions for AuthenticationDetails {
                 serde_json::from_str(&json)?
             }
             None => {
-                eprintln!("Error in database retrieval; key had no stored values");
+                println!(
+                    "{}[authentication] Error in database retrieval; {} had no stored values",
+                    timestamp::now(),
+                    username.to_string()
+                );
                 return Ok(None);
             }
         };
+        println!(
+            "{}[authentication] values retrieved for {}",
+            timestamp::now(),
+            username.to_string(),
+        );
         Ok(Some(db_item))
     }
     fn db_update(&self, db: &Db) -> Result<(), Box<dyn Error>> {
