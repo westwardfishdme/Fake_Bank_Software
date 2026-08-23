@@ -17,10 +17,12 @@ pub fn open_user_database() -> Db {
     println!("opening user_information_database...");
     sled::open(USER_DATABASE_PATH).unwrap()
 }
-pub trait DatabaseInteractions<T: ToString, S: ToString> {
+pub trait DatabaseInteractions {
     type ValueStruct;
-    fn create(username: T, password: S) -> Result<(), Box<dyn std::error::Error>>;
-    fn get_from_database(u: T) -> Result<Self::ValueStruct, Box<dyn std::error::Error>>;
-    fn update(&mut self) -> Result<(), Box<dyn std::error::Error>>;
-    fn delete(&mut self) -> Result<(), Box<dyn std::error::Error>>;
+    fn db_get<T: ToString>(
+        username: T,
+        db: &Db,
+    ) -> Result<Option<Self::ValueStruct>, Box<dyn std::error::Error>>;
+    fn db_update(&self, db: &Db) -> Result<(), Box<dyn std::error::Error>>;
+    fn db_delete(&self, db: &Db) -> Result<(), Box<dyn std::error::Error>>;
 }
