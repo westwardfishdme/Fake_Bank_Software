@@ -1,5 +1,6 @@
 use super::accounts::{self, Account};
 use crate::modules::database::utilities::DatabaseInteractions;
+use chrono::DateTime;
 use hex::{self, ToHex};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -214,6 +215,7 @@ impl AuthenticationDetails {
     pub fn db_create(&self, db: &Db) -> Result<(), Box<dyn Error>> {
         //! Creates an authentication account in the auth db.
         let json = serde_json::to_string(self)?;
+        println!("[authentication] Created new user: {}", self.username(),);
         db.insert(self.username(), json.as_bytes())?;
         Ok(())
     }
@@ -285,7 +287,8 @@ mod tests {
     fn test_authentication() {
         let user_session = create_user();
         let user_db = sled::open("/tmp/test_database").unwrap();
-        let _ = Account::create_new_user("popqop", "popqop", Some(20_f64))
+        let _ = Account::create_new_user("popqop", "popqop", 20_f64)
+            .unwrap()
             .db_create(user_session.username(), &user_db);
         // test authentication
         assert!(
