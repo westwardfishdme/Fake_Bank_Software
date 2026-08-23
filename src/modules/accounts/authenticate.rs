@@ -66,17 +66,21 @@ impl User {
         Ok(Some(db_item))
     }
 
-    pub fn create(self, auth_db: &Db, acct_db: &Db) -> Result<(), Box<dyn Error>> {
+    pub fn create(self, auth_db: &Db, acct_db: &Db) -> Result<(), &'static str> {
         //! creates the user in both the account and authentication database.
         let username = self.username;
         let authentication = AuthenticationDetails::create_new_user(&username, self.password);
+        let initial_balance = match self.init_balance {
+            Some(v) => v,
+            None => return Err("Missing value: init_balance in JSON request."),
+        };
         let account = Account::create_new_user(
             self.first_name
                 .expect("[error] first name was not provided in account creation"),
             self.last_name
                 .expect("[error] last name was not provided in account creation"),
-            self.init_balance,
-        );
+            initial_balance,
+        )?;
         authentication
             .db_create(auth_db)
             .expect("[authentication] failed to create the user in the database");

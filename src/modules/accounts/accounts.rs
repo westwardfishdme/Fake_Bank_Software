@@ -16,20 +16,19 @@ impl Account {
     pub fn create_new_user<T: ToString, S: ToString>(
         first: T,
         last: S,
-        start_balance: Option<f64>,
-    ) -> Account {
+        start_balance: f64,
+    ) -> Result<Account, &'static str> {
         //! Creates a new account for the user.
-        let unwrapped_balance = if start_balance.is_some() {
-            start_balance.unwrap()
-        } else {
-            0_f64
-        };
-        Account {
+
+        if start_balance < 100_f64 {
+            return Err("User does not have enough money to open account! (value was < $200)");
+        }
+        Ok(Account {
             first_name: first.to_string(),
             last_name: last.to_string(),
-            balance: unwrapped_balance,
+            balance: start_balance,
             transaction_history: None,
-        }
+        })
     }
     pub fn db_create<T: ToString>(
         &self,
