@@ -1,4 +1,7 @@
-use crate::modules::accounts::authenticate::{AuthenticationDetails, User};
+use crate::modules::{
+    accounts::authenticate::{AuthenticationDetails, User},
+    rest::handler::APIError::BadRequest,
+};
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use serde_json::{Value, json};
 use sled::Db;
@@ -72,7 +75,7 @@ async fn change_password(
     }
 }
 
-async fn post_create(
+async fn create_account(
     Json(auth_payload): Json<User>,
     auth_db: Db,
     user_db: Db,
@@ -82,15 +85,15 @@ async fn post_create(
      * this will be used by pentesters and competitors
      * to create a bad account
      */
-    if auth_payload
-        .clone()
-        .login(&auth_db)
-        .expect("failed to authenticate in the DB")
-        .is_none()
-    {
-        auth_payload
-            .create(&auth_db, &user_db)
-            .expect("failed to create an account");
+    let login = match auth_payload.clone().login(&auth_db) {
+        Ok(v) => v,
+        Err(_) => return Err(APIError::FailedAuthentication),
+    };
+    if login.is_none() {
+        match auth_payload.create(&auth_db, &user_db) {
+            Ok(_) => (),
+            Err(e) => return Err(BadRequest(e)),
+        }
         return Ok(Json(json!({"user_creation":"success"})));
     }
     Err(APIError::AlreadyExists)
@@ -145,7 +148,7 @@ pub fn run(auth_db: Db, user_db: Db) -> Router {
             "/account/create",
             get(()).post({
                 let auth_db = auth_db.clone();
-                move |create| post_create(create, auth_db, user_db)
+                move |create| create_account(create, auth_db, user_db)
             }),
         )
         .route("/", get(health))
