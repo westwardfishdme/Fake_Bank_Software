@@ -23,14 +23,29 @@ pub fn now() -> String {
     //! creates a timestamp.
     //! looks like: [Fri Aug 31 03:00:30]
     let now = Local::now();
+    let hour = now.hour();
+    let hour = match hour {
+        0..10 => format!("0{hour}",),
+        _ => format!("{}", hour),
+    };
+    let minute = now.minute();
+    let minute = match minute {
+        0..10 => format!("0{minute}",),
+        _ => format!("{}", minute),
+    };
+    let second = now.second();
+    let second = match second {
+        0..10 => format!("0{second}",),
+        _ => format!("{}", second),
+    };
 
     format!(
         "[{} {} {} {}:{}:{}]",
         now.weekday(),
         enumerate_month(now.month()),
         now.day(),
-        now.hour(),
-        now.minute(),
-        now.second(),
+        hour,
+        minute,
+        second
     )
 }
