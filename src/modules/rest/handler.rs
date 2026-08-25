@@ -1,10 +1,10 @@
-use crate::modules::{
-    accounts::authenticate::{AuthenticationDetails, User},
-    rest::handler::APIError::BadRequest,
-};
+use crate::log;
+use crate::modules::{accounts::authenticate::User, rest::handler::APIError::BadRequest};
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use serde_json::{Value, json};
 use sled::Db;
+use std::ops::Deref;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 enum APIError {
@@ -31,6 +31,7 @@ impl IntoResponse for APIError {
             ),
             APIError::AlreadyExists => (StatusCode::BAD_REQUEST, "User already exists".into()),
         };
+        log!("an error occurred when processing a request: {}", e);
         let body = axum::Json(json!({
             "error": e
         }));
@@ -51,11 +52,11 @@ async fn get_login(Json(auth_payload): Json<User>, auth_db: Db) -> Result<Json<V
 
     /*
      * [intentionally vulnerable]
-     * we want to create a user here and have users
-     * be able to grab the hash and salt values from just providing
-     * a valid user name.
+     * we want to  have users be able to grab the hash and salt values from
+     * just providing a valid user name.
      */
-
+    log!("Received GET request at /login");
+    log!("getting user information for: {}", auth_payload.username());
     match auth_payload
         .login(&auth_db)
         .expect("[Authentication] failed")
@@ -69,7 +70,9 @@ async fn change_password(
     Json(auth_payload): Json<User>,
     auth_db: Db,
 ) -> Result<Json<Value>, APIError> {
-    match auth_payload.clone().new_password(&auth_db) {
+    log!("Received PATCH request at /login");
+    log!("Changing the password for: {}", auth_payload.username());
+    match auth_payload.new_password(&auth_db) {
         Ok(_) => Ok(Json(json!({"update_password":"success"}))),
         Err(e) => Err(APIError::BadRequest(e)),
     }
@@ -85,7 +88,9 @@ async fn create_account(
      * this will be used by pentesters and competitors
      * to create a bad account
      */
-    let login = match auth_payload.clone().login(&auth_db) {
+    log!("Received POST request at /account/create");
+    log!("Attempting to create account: {}", auth_payload.username());
+    let login = match auth_payload.login(&auth_db) {
         Ok(v) => v,
         Err(_) => return Err(APIError::FailedAuthentication),
     };
@@ -94,6 +99,10 @@ async fn create_account(
             Ok(_) => (),
             Err(e) => return Err(BadRequest(e)),
         }
+        log!(
+            "successfully pulled login details for {}",
+            auth_payload.username()
+        );
         return Ok(Json(json!({"user_creation":"success"})));
     }
     Err(APIError::AlreadyExists)
@@ -105,8 +114,11 @@ async fn get_account(
     user_db: Db,
 ) -> Result<Json<Value>, APIError> {
     //! gets the user's account from authenticating.
-    let auth_payload = &auth_payload;
-
+    log!("Received GET request at /account");
+    log!(
+        "attempting to get account details for: {}",
+        auth_payload.username()
+    );
     let account = match auth_payload
         .clone()
         .login(&auth_db)
