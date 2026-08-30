@@ -1,35 +1,76 @@
-use super::transaction::{TransferFailures, Transfers};
+use super::transaction::Transaction;
+use crate::log;
 use serde::{Deserialize, Serialize};
+use serde_json::to_vec;
 use sled::Db;
 use std::error::Error;
 
 use crate::modules::database::utilities::DatabaseInteractions;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Account {
+    username: String,
     balance: f64,
     first_name: String,
     last_name: String,
-    transaction_history: Option<Box<[Account]>>,
+    transaction_history: Option<Box<[Transaction]>>,
 }
 
 impl Account {
-    pub fn create_new_user<T: ToString, S: ToString>(
+    pub fn create_new_user<T: ToString, S: ToString, U: ToString>(
+        user: U,
         first: T,
         last: S,
         start_balance: f64,
     ) -> Result<Account, &'static str> {
         //! Creates a new account for the user.
+        let username = user.to_string();
+        log!("[account] Creating an account for user {}", username);
 
         if start_balance < 100_f64 {
+            log!("[account] User {}", username);
             return Err("User does not have enough money to open account! (value was < $200)");
         }
         Ok(Account {
+            username: user.to_string(),
             first_name: first.to_string(),
             last_name: last.to_string(),
             balance: start_balance,
             transaction_history: None,
         })
     }
+    pub fn balance(&self) -> f64 {
+        //! gets the username associated with the account.
+        self.balance
+    }
+
+    pub fn get_transaction_history(&self) -> &Option<Box<[Transaction]>> {
+        &self.transaction_history
+    }
+
+    pub fn append_to_transaction_history(&mut self, trans: Transaction) {
+        //! appends to the user's transaction_history
+        match &self.transaction_history {
+            Some(v) => {
+                let mut vec_transaction: Vec<Transaction> = (*v).to_vec();
+                vec_transaction.push(trans);
+                self.transaction_history = Some(vec_transaction.into_boxed_slice())
+            }
+            None => {
+                let vec_transaction: Vec<Transaction> = vec![trans; 1];
+                self.transaction_history = Some(vec_transaction.into_boxed_slice())
+            }
+        }
+    }
+
+    pub fn get_username(&self) -> &String {
+        //! gets the username associated with the account.
+        &self.username
+    }
+    pub fn set_new_balance(&mut self, amount: f64) {
+        //! sets the new balance from a given amount.
+        self.balance = amount;
+    }
+
     pub fn db_create<T: ToString>(
         &self,
         username: T,
@@ -68,20 +109,14 @@ impl DatabaseInteractions for Account {
         Ok(db_item)
     }
     fn db_delete(&self, db: &Db) -> Result<(), Box<dyn std::error::Error>> {
+        //! updates an object in the authentication database
+        db.remove(self.get_username())?;
         Ok(())
     }
     fn db_update(&self, db: &Db) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(())
-    }
-}
-impl Transfers for Account {
-    fn send<T: ToString>(&self, recipient: T) -> Result<(), TransferFailures> {
-        Ok(())
-    }
-    fn request<T: ToString>(&self, recipient: T) -> Result<(), TransferFailures> {
-        Ok(())
-    }
-    fn reverse(&self) -> Result<(), TransferFailures> {
+        let json = serde_json::to_string(self)?;
+        db.remove(self.get_username())?;
+        db.insert(self.get_username(), json.as_bytes())?;
         Ok(())
     }
 }

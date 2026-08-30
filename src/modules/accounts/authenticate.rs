@@ -7,7 +7,6 @@ use serde_json;
 use sha2::{Digest, Sha256};
 use sled::Db;
 use std::error::Error;
-use std::rc::Rc;
 
 /* general purpose functions */
 fn create_salt() -> String {
@@ -37,6 +36,34 @@ pub struct User {
     last_name: Option<String>,
     new_password: Option<String>,
     init_balance: Option<f64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Transfer struct that allows a user to send money to other accounts
+pub struct UserTransfer {
+    username: String,
+    password: String,
+    recipient: String,
+    amount: f64,
+}
+
+impl UserTransfer {
+    pub fn login(&self, auth_db: &Db) -> Result<Option<AuthenticationDetails>, Box<dyn Error>> {
+        //! returns the auth db values.
+        AuthenticationDetails::db_get(&self.username, auth_db)
+    }
+    pub fn get_recipient(&self) -> &String {
+        &self.recipient
+    }
+    pub fn get_amount(&self) -> f64 {
+        self.amount
+    }
+    pub fn username(&self) -> &str {
+        &self.username
+    }
+    pub fn password(&self) -> &str {
+        &self.password
+    }
 }
 
 impl User {
@@ -79,6 +106,7 @@ impl User {
         };
 
         let account = Account::create_new_user(
+            username,
             match &self.first_name {
                 Some(v) => v,
                 None => {
