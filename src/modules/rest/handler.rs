@@ -1,10 +1,11 @@
-use crate::log;
-use crate::modules::{accounts::authenticate::User, rest::handler::APIError::BadRequest};
+use crate::modules::accounts::authenticate::{User, UserTransfer};
+use crate::modules::accounts::transaction::{self, TransferFailures};
+use crate::{log, modules::accounts::transaction::Transfers};
+use axum::body::Body;
+use axum::http::Response;
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use serde_json::{Value, json};
 use sled::Db;
-use std::ops::Deref;
-use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 enum APIError {
@@ -13,6 +14,25 @@ enum APIError {
     AlreadyExists,
     InternalError,
     BadRequest(&'static str),
+}
+
+impl IntoResponse for TransferFailures {
+    fn into_response(self) -> axum::response::Response {
+        let (status, e): (StatusCode, String) = match self {
+            TransferFailures::FailedToSend(e) => (StatusCode::BAD_REQUEST, e.into()),
+            TransferFailures::InsufficientFunds(e) => (StatusCode::BAD_REQUEST, e.into()),
+            TransferFailures::DatabaseFailure(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.into()),
+            TransferFailures::AccountDoesNotExist(e) => (StatusCode::NOT_FOUND, e.into()),
+            TransferFailures::NoTransactionHistory(e) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, e.into())
+            }
+        };
+        log!("an error occurred when processing a request: {}", e);
+        let body = axum::Json(json!({
+            "error": e
+        }));
+        (status, body).into_response()
+    }
 }
 
 /// The IntoResponse
@@ -38,6 +58,7 @@ impl IntoResponse for APIError {
         (status, body).into_response()
     }
 }
+
 async fn health() -> impl IntoResponse {
     //! checks the health and status of the REST API
     Json(json!({
@@ -97,7 +118,7 @@ async fn create_account(
     if login.is_none() {
         match auth_payload.create(&auth_db, &user_db) {
             Ok(_) => (),
-            Err(e) => return Err(BadRequest(e)),
+            Err(e) => return Err(APIError::BadRequest(e)),
         }
         log!(
             "successfully pulled login details for {}",
@@ -135,6 +156,46 @@ async fn get_account(
     }
 }
 
+async fn transfer(
+    Json(transfer_payload): Json<UserTransfer>,
+    auth_db: Db,
+    user_db: Db,
+) -> Result<Json<Value>, Response<Body>> {
+    //! sends money from the account.
+    log!("Received post request to /account");
+    let authentication = match transfer_payload
+        .clone()
+        .login(&auth_db)
+        .expect("failed to authenticate in the REST API")
+    {
+        Some(v) => v,
+        None => return Err(APIError::NotFound.into_response()),
+    };
+
+    let mut account =
+        match authentication.authenticate_to_account(transfer_payload.password(), &user_db) {
+            Ok(Some(v)) => v,
+            Ok(None) => return Err(APIError::FailedAuthentication.into_response()),
+            Err(_) => return Err(APIError::NotFound.into_response()),
+        };
+
+    match account.send(
+        transfer_payload.get_recipient(),
+        transfer_payload.get_amount(),
+        &user_db,
+    ) {
+        Ok(()) => Ok(Json(json!({"transfer_status": "ok"}))),
+        Err(e) => {
+            let error = e.into_response();
+            return Err(error);
+        }
+    }
+}
+
+fn clone_both(auth_db: &Db, user_db: &Db) -> (Db, Db) {
+    (auth_db.clone(), user_db.clone())
+}
+
 pub fn run(auth_db: Db, user_db: Db) -> Router {
     Router::new()
         .route(
@@ -151,9 +212,12 @@ pub fn run(auth_db: Db, user_db: Db) -> Router {
         .route(
             "/account",
             get({
-                let auth_db = auth_db.clone();
-                let user_db = user_db.clone();
+                let (auth_db, user_db) = clone_both(&auth_db, &user_db);
                 move |login| get_account(login, auth_db, user_db)
+            })
+            .post({
+                let (auth_db, user_db) = clone_both(&auth_db, &user_db);
+                move |login| transfer(login, auth_db, user_db)
             }),
         )
         .route(
