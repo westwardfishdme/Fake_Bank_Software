@@ -12,7 +12,6 @@ enum APIError {
     NotFound,
     FailedAuthentication,
     AlreadyExists,
-    InternalError,
     BadRequest(&'static str),
 }
 
@@ -44,10 +43,6 @@ impl IntoResponse for APIError {
             APIError::FailedAuthentication => (
                 StatusCode::UNAUTHORIZED,
                 "failed to authenticate user. access was denied".into(),
-            ),
-            APIError::InternalError => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "server failed internally.".into(),
             ),
             APIError::AlreadyExists => (StatusCode::BAD_REQUEST, "User already exists".into()),
         };
@@ -183,7 +178,7 @@ async fn transfer(
         };
 
     log!(
-        "Transferring ${:.2} from {} to {}",
+        "Attempting to Transfer ${:.2} from {} to {}",
         transfer_payload.get_amount(),
         transfer_payload.username(),
         transfer_payload.get_recipient()
