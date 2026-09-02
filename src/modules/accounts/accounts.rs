@@ -47,19 +47,20 @@ impl Account {
         &self.transaction_history
     }
 
-    pub fn append_to_transaction_history(&mut self, trans: Transaction) {
+    pub fn append_to_transaction_history(&mut self, transaction: &Transaction) {
         //! appends to the user's transaction_history
         match &self.transaction_history {
             Some(v) => {
                 let mut vec_transaction: Vec<Transaction> = (*v).to_vec();
-                vec_transaction.push(trans);
-                self.transaction_history = Some(vec_transaction.into_boxed_slice())
+                vec_transaction.push(transaction.clone());
+                self.transaction_history = Some(vec_transaction.into_boxed_slice());
+                return;
             }
             None => {
-                let vec_transaction: Vec<Transaction> = vec![trans; 1];
-                self.transaction_history = Some(vec_transaction.into_boxed_slice())
+                let vec_transaction: Vec<Transaction> = vec![transaction.clone(); 1];
+                self.transaction_history = Some(vec_transaction.into_boxed_slice());
             }
-        }
+        };
     }
 
     pub fn get_username(&self) -> &String {

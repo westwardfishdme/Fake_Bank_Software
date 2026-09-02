@@ -101,11 +101,16 @@ impl Transfers for Account {
 
         let new_balance = self.balance() - amount;
         self.set_new_balance(new_balance);
+
+        let new_balance = recipient.balance() + amount;
+        self.append_to_transaction_history(&transaction);
+        recipient.set_new_balance(new_balance);
+        recipient.append_to_transaction_history(&transaction);
         match self.db_update(account_database) {
             Ok(()) => (),
             Err(_) => {
                 log!(
-                    "[account] Failed to update the user database for user {}",
+                    "[account] Failed to update the user database for the sender {}",
                     self.get_username()
                 );
                 return Err(TransferFailures::FailedToSend(
@@ -113,15 +118,13 @@ impl Transfers for Account {
                 ));
             }
         }
-
-        let new_balance = recipient.balance() + amount;
-        self.append_to_transaction_history(transaction);
-
-        recipient.set_new_balance(new_balance);
         match recipient.db_update(account_database) {
             Ok(()) => Ok(()),
             Err(_) => {
-                log!("Failed to update database");
+                log!(
+                    "Failed to update database for the recipient: {}",
+                    recipient.get_username()
+                );
                 Err(TransferFailures::DatabaseFailure(
                     "failed to update database",
                 ))
