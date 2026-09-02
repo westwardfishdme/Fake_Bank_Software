@@ -12,18 +12,27 @@ ready will be disclosed at a later date.
 These branches are:
   - main
 
-The branch we will upload is:
-  - fake main
-  - experimental
+The branch we will upload publicly is:
+  - release (not yet created)
 
-## Flags:
+# Flags:
 
+### Implemented
 - Anyone can pull any User's authentication information; including the password hash + the salt value used to calculate the hash. 
-This will be a flag for the admin account! (flag not implemented)
-- Users will be able to create accounts with any set balance. (flag not implemented)
-- Users will be able to log into one of jordan's dummy accounts and be able to trace the account history (flag not implemented)
+This will be a flag for the admin account! (implemented) 
+
+### Partially Implemented
+- Users will be able to create accounts with any set balance. (partially implemented)
+
+### Not Yet Implemented
+- Users will be able to log into one of jordan's actual account and be able to trace the account history to find 
+dummy accounts to find money trail. (flag not implemented)
 - Users will be able to see commit history and get a flag there (flag not implemented)
 - Users will be able to switch to an experimental branch with the flag in the readme (flag not implemented)
 
-# Interacting with the REST-API
-The REST-API is built with usability in mind;
+## Some Easter eggs
+;) python script has more information
+
+# Readme
+the actual readme that will be uploaded to the github page is located inside of this directory here:
+- [ readme ](./docs/README.md)
