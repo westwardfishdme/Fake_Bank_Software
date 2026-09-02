@@ -100,7 +100,7 @@ impl DatabaseInteractions for Account {
                 serde_json::from_str(&json).expect("json is not stored correctly in the account db")
             }
             None => {
-                eprintln!(
+                log!(
                     "[account] Error in user database retrieval for {}; key had no stored values",
                     username.to_string()
                 );
