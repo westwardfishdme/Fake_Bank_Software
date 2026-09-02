@@ -1,5 +1,5 @@
 use crate::modules::accounts::authenticate::{User, UserTransfer};
-use crate::modules::accounts::transaction::{self, TransferFailures};
+use crate::modules::accounts::transaction::TransferFailures;
 use crate::{log, modules::accounts::transaction::Transfers};
 use axum::body::Body;
 use axum::http::Response;
@@ -162,7 +162,6 @@ async fn transfer(
     user_db: Db,
 ) -> Result<Json<Value>, Response<Body>> {
     //! sends money from the account.
-    log!("Received post request to /account");
     let authentication = match transfer_payload
         .clone()
         .login(&auth_db)
@@ -171,6 +170,10 @@ async fn transfer(
         Some(v) => v,
         None => return Err(APIError::NotFound.into_response()),
     };
+    log!(
+        "Received post request to /account for user {}",
+        authentication.username()
+    );
 
     let mut account =
         match authentication.authenticate_to_account(transfer_payload.password(), &user_db) {
@@ -178,6 +181,13 @@ async fn transfer(
             Ok(None) => return Err(APIError::FailedAuthentication.into_response()),
             Err(_) => return Err(APIError::NotFound.into_response()),
         };
+
+    log!(
+        "Transferring ${:.2} from {} to {}",
+        transfer_payload.get_amount(),
+        transfer_payload.username(),
+        transfer_payload.get_recipient()
+    );
 
     match account.send(
         transfer_payload.get_recipient(),
