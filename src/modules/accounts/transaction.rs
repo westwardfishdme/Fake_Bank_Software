@@ -81,7 +81,7 @@ impl Transfers for Account {
                     "[account] failed to perform transaction: account database failed to be read."
                 );
                 return Err(TransferFailures::FailedToSend(
-                    "Failed to access the given database.",
+                    "Failed to access the account database.",
                 ));
             }
         };
