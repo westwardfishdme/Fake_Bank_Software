@@ -1,4 +1,4 @@
-# Unfinished Fake Bank Software
+# Fake Bank Software
 This directory holds the source code for the REST-API that Finch is building for
 the WiCys x 7968 git challenge. Below is a check list of what needs to get done:
 
@@ -12,8 +12,14 @@ ready will be disclosed at a later date.
 These branches are:
   - main
 
-The branch we will upload publicly is:
-  - release (not yet created)
+**The code we will upload publicly is inside of the project repository on 7968's github organization.**
+Please request to be added to the repository by Finch please.
+
+The official page for hosting the program is inside of this private repository:
+- [7968luc/apricot-banking-software](https://github.com/7968luc/apricot-banking-software)
+
+## Contributing 
+Please submit a pull request if you have working code that is ready to be added to the repository.
 
 # Running and Testing
 First clone this repository:
