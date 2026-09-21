@@ -15,7 +15,7 @@ These branches are:
 **The code we will upload publicly is inside of the project repository on 7968's github organization.**
 Please request to be added to the repository by Finch please.
 
-The official page for hosting the program is inside of this private repository:
+The official page for hosting the code for the CTF is inside of this private repository:
 - [7968luc/apricot-banking-software](https://github.com/7968luc/apricot-banking-software)
 
 ## Contributing 
