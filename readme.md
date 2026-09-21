@@ -18,6 +18,8 @@ Please request to be added to the repository by Finch please.
 The official page for hosting the code for the CTF is inside of this private repository:
 - [7968luc/apricot-banking-software](https://github.com/7968luc/apricot-banking-software)
 
+**DO NOT SUBMIT ANY CODE TO THE REPOSITORY LISTED ABOVE.**
+
 ## Contributing 
 Please submit a pull request if you have working code that is ready to be added to the repository.
 
