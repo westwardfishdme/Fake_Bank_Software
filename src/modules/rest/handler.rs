@@ -207,11 +207,11 @@ pub fn run(auth_db: Db, user_db: Db) -> Router {
             "/login",
             get({
                 let auth_db = auth_db.clone();
-                move |login| get_login(login, auth_db)
+                move |request| get_login(request, auth_db)
             })
             .patch({
                 let auth_db = auth_db.clone();
-                move |login| change_password(login, auth_db)
+                move |request| change_password(request, auth_db)
             }),
         )
         .route(
@@ -222,14 +222,14 @@ pub fn run(auth_db: Db, user_db: Db) -> Router {
             })
             .post({
                 let (auth_db, user_db) = clone_both(&auth_db, &user_db);
-                move |login| transfer(login, auth_db, user_db)
+                move |request| transfer(request, auth_db, user_db)
             }),
         )
         .route(
             "/account/create",
             get(()).post({
                 let auth_db = auth_db.clone();
-                move |create| create_account(create, auth_db, user_db)
+                move |request| create_account(request, auth_db, user_db)
             }),
         )
         .route("/", get(health))
