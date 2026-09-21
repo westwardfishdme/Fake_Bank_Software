@@ -1,6 +1,6 @@
 use super::accounts::{self, Account};
 use crate::log;
-use crate::modules::{database::utilities::DatabaseInteractions, logging::timestamp};
+use crate::modules::database::utilities::DatabaseInteractions;
 use hex::{self, ToHex};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -178,6 +178,7 @@ impl AuthenticationDetails {
             permission_id: 2,
         }
     }
+
     pub fn set_new_password<T: ToString, U: ToString>(
         &mut self,
         new_password: T,
@@ -226,7 +227,7 @@ impl AuthenticationDetails {
         self.password_hash.clone()
     }
 
-    pub fn create_admin_account<T: ToString>(password: T, auth_db: &Db) {
+    pub fn create_admin_account<T: ToString>(password: T, auth_db: &Db, account_db: &Db) {
         //! Creates an administrative account. If a base 'admin' user does not exist already-- this
         //! function will create the user, other wise it requires an admin account to create.
         if auth_db
@@ -239,6 +240,11 @@ impl AuthenticationDetails {
             admin
                 .db_create(auth_db)
                 .expect("failed to create the admin acct");
+
+            let account =
+                Account::create_new_user("admin", "flag", "b4d_P455w0rdddz", 999_999_999_f64)
+                    .unwrap();
+            account.db_create("admin", account_db);
         }
     }
 

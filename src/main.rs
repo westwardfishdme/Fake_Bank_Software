@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("failed to open auth_db")
         .is_none()
     {
-        AuthenticationDetails::create_admin_account(DEFAULT_ADMIN_PASSWORD, &auth_db);
+        AuthenticationDetails::create_admin_account(DEFAULT_ADMIN_PASSWORD, &auth_db, &user_db);
     }
 
     let rest_api = rest::handler::run(auth_db, user_db);
