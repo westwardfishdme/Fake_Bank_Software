@@ -20,6 +20,7 @@ The official page for hosting the code for the CTF is inside of this private rep
 
 **DO NOT SUBMIT ANY CODE TO THE REPOSITORY LISTED ABOVE.**
 
+
 ## Contributing 
 Please submit a pull request if you have working code that is ready to be added to the repository.
 
@@ -65,6 +66,13 @@ dummy accounts to find money trail. (implemented)
 
 # Solutions
 Below are the following solutions to each flag. (replace /path/to/* with the actual path to whichever wordlist is used.)
+Solutions assumes that you have the following [seclists package](https://github.com/danielmiessler/SecLists).
+
+You may also need to add the [BiblePass wordlist](https://github.com/MusicGivesMeLife/BiblePass/); which is used for Jordan's
+Account (his password being `Proverbs22:7` from this file here: 
+
+BiblePass_partal.txt [[raw](https://raw.githubusercontent.com/MusicGivesMeLife/BiblePass/refs/heads/master/BiblePass_partai.txt)]
+
 
 ## Admin Password
 1. curl the server with the following GET request and forward the output to hash.txt
@@ -109,7 +117,10 @@ curl -X GET -H "Content-Type: application/json" -d '{"username":"admin", "passwo
 ```
 
 ## Jordan's Password
-Same as the steps above but replace `admin` with `jmercer`; and use `/path/to/bible.txt`
+Same as the steps above but replace `admin` with `jmercer`; and use `/path/to/BiblePass/BiblePass_part09.txt`;
+Although this might be renamed to `BiblePass_partai.txt`.
+
+[See subtext here](#Solutions).
 
 
 ## Some Easter eggs
