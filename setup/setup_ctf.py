@@ -132,16 +132,22 @@ def generate_names() -> ([str], [str]):
     print("generating names...")
     first_names = []
     last_names = []
-    with open("./us_first_names.txt", "r") as file:
-        lines = file.readlines()
-        for i in lines:
-            # removes the newline character
-            first_names.append(i[:-1])
-    with open("./us_last_names.txt", "r") as file:
-        lines = file.readlines()
+    try:
+        with open("./us_first_names.txt", "r") as file:
+            lines = file.readlines()
+            for i in lines:
+                # removes the newline character
+                first_names.append(i[:-1])
+        with open("./us_last_names.txt", "r") as file:
+            lines = file.readlines()
 
-        for i in lines:
-            last_names.append(i[:-1])
+            for i in lines:
+                last_names.append(i[:-1])
+    except FileNotFoundError:
+        print(
+            "[Error]: must run this script inside of the setup/ directory",
+            file=sys.stderr)
+        exit(1)
     return (first_names, last_names)
 
 
@@ -252,7 +258,7 @@ class ImportantCTFaccounts:
         username = f"{create_username(first_name, "Mercer")}"
 
         # found in wordlists/Passwords/bible.txt
-        password = "Commandments"
+        password = "commandments"
         jordan = Account(username, password,
                          first_name, last_name, 15_000)
         jordan.create()
