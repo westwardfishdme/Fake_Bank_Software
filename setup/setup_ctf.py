@@ -257,8 +257,9 @@ class ImportantCTFaccounts:
         last_name = "Mercer (flag: {ozX_B1Blica1})"
         username = f"{create_username(first_name, "Mercer")}"
 
-        # found in wordlists/Passwords/bible.txt
-        password = "commandments"
+        # found in seclists/Passwords/BiblePass/BiblePass_part09.txt
+        # see readme for more information if the file is not there.
+        password = "Proverbs22:7"
         jordan = Account(username, password,
                          first_name, last_name, 15_000)
         jordan.create()
