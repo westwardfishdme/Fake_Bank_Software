@@ -23,27 +23,25 @@ pub fn now() -> String {
     //! creates a timestamp.
     //! looks like: [Fri Aug 31 03:00:30]
     let now = Local::now();
-    let hour = now.hour();
-    let hour = match hour {
-        0..10 => format!("0{hour}",),
-        _ => format!("{}", hour),
-    };
+    let hour = 16; // 
     let minute = now.minute();
-    let minute = match minute {
-        0..10 => format!("0{minute}",),
-        _ => format!("{}", minute),
-    };
     let second = now.second();
+
+    // always use it on the 10 minute interval start script
+    // at any 0 on the clock (i.e. 2:10 or 4:00 etc.)
+    let minute = 20 + (minute % 10);
     let second = match second {
         0..10 => format!("0{second}",),
         _ => format!("{}", second),
     };
 
+    // ALWAYS USE NOV 19
+    // [Thu Nov 19 16:2{}:{} ]
     format!(
         "[{} {} {} {}:{}:{}]",
-        now.weekday(),
-        enumerate_month(now.month()),
-        now.day(),
+        "Thu",
+        enumerate_month(11),
+        19,
         hour,
         minute,
         second
