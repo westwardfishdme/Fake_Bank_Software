@@ -29,7 +29,6 @@ pub fn now() -> String {
 
     // always use it on the 10 minute interval start script
     // at any 0 on the clock (i.e. 2:10 or 4:00 etc.)
-    let minute = 20 + (minute % 10);
     let second = match second {
         0..10 => format!("0{second}",),
         _ => format!("{}", second),
