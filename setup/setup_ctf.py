@@ -193,6 +193,32 @@ def create_username(first_name, last_name, add_numbers: bool = False) -> str:
 # These are for doing random actions later.
 
 
+class Person:
+    def __init__(self,
+                 first: str,
+                 last: str,
+                 user: str,
+                 money: float):
+        self.first_name = first.capitalize()
+        self.last_name = last.capitalize()
+        self.username = user
+        self.money = money
+
+    def into_account(self) -> Account:
+        """
+        Converts the person into an account type usable on the server.
+        All things remain constant with the exception of the password
+        which is randomly generated.
+
+        DO NOT USE THIS METHOD FOR JORDAN.
+        """
+        return Account(self.username,
+                       randompassword(),
+                       self.first_name,
+                       self.last_name,
+                       self.money)
+
+
 class ImportantCTFaccounts:
     """
     Important CTF accounts that are used separately
@@ -221,30 +247,24 @@ class ImportantCTFaccounts:
         print("Setting up all the main characters in the story.")
         users = []
 
-        # do this for every account.
-        user: Account = Account("maya_caldwell", randompassword(),
-                                "Maya", "Caldwell", 32_580)
-        users.append(user)
+        # usernames used and their names.
+        important_people = [
+            Person("maya", "caldwell", "maya_caldwell", 32_580.53),
+            Person("richard", "holt", "rholt", 7_238_495.12),
+            Person("alex", "turner", "alex_turner10101011", 23_540.32),
+            Person("priya", "nath", "priya_nath4994", 53_2312.29),
+            Person("sasha", "okafor", "sasha_oka4", 32_402.20)
+        ]
 
-        user: Account = Account("rholt", randompassword(),
-                                "Richard", "Holt", 7_238_495)
-        users.append(user)
-        user: Account = Account("alex_turner10101011", randompassword(),
-                                "Alex", "Turner", 23_540)
-        users.append(user)
-        user: Account = Account("priya_nath4994", randompassword(),
-                                "Priya", "Nath", 53_540)
-        users.append(user)
-        user: Account = Account("sasha_oka4", randompassword(),
-                                "Sasha", "Okafor", 32_440)
-        users.append(user)
-
-        for someuser in users:
-            self.__usernames.append(someuser.get_username())
-            self.__otherusers[someuser.get_username()] = someuser
-            someuser.create()
+        for person in important_people:
+            account: Account = person.into_account()
+            self.__usernames.append(account.get_username())
+            self.__otherusers[account.get_username()] = account
+            users.append(account)
+            account.create()
 
     # TA
+
     def __setup_jordan(self):
         """
         Make Jordan's account
@@ -280,6 +300,12 @@ class ImportantCTFaccounts:
         # participants.
         admin: Account = Account("admin", "password")
         admin.set_new_password("tokiohotel")
+
+    def user_actions(self):
+        """
+        Allows narrative telling of what occurred the day of the breach.
+        These actions need to be potentially timed.
+        """
 
 
 class EasterEggs:
